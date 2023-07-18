@@ -1,0 +1,182 @@
+---
+title: "APS1 - Microeconomia IV - Grupo 10"
+author: "Antonio Ehler, Bruno Weber, Mel Alencastro"
+date: "2023-02-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Bibliotecas
+
+```{r}
+library(fastDummies)
+library(knitr)
+library(lmtest)
+library(pastecs)
+library(pdynmc)
+library(plm)
+library(readxl)
+library(sandwich)
+library(tidyverse)
+```
+
+## Parte 1 - Importação de Dados
+
+```{r}
+df <- read_excel("APS1_dados_xlsx.xlsx")
+```
+
+## Parte 2 - Estatísticas Descritivas
+
+### Tabela com Variáveis de Interesse
+
+```{r}
+descStats = data.frame(roubo_veiculos = format(round(stat.desc(df$roubo_veiculos, basic=FALSE, norm=FALSE),2),2),
+                       furto_veiculos = format(round(stat.desc(df$furto_veiculos, basic=FALSE, norm=FALSE),2),2),
+                       homicidios = format(round(stat.desc(df$homicidios, basic=FALSE, norm=FALSE),2),2),
+                       roubo_outros = format(round(stat.desc(df$roubo_outros, basic=FALSE, norm=FALSE),2),2))
+descStats = t(descStats)
+View(descStats)
+```
+
+### Gráficos Variável x Ano
+
+```{r}
+plot(df$year, df$roubo_veiculos, xlim = c(2011, 2019), ylim = c(0, 5100), xlab = "Ano", ylab = "Roubo de Veiculos")
+plot(df$year, df$furto_veiculos, xlim = c(2011, 2019), ylim = c(0, 5000), xlab = "Ano", ylab = "Furto de Veiculos")
+plot(df$year, df$homicidios, xlim = c(2011, 2019), ylim = c(0, 200), xlab = "Ano", ylab = "Homicidios")
+plot(df$year, df$roubo_outros, xlim = c(2011, 2019), ylim = c(0, 15000), xlab = "Ano", ylab = "Outros Roubos")
+```
+
+### Tabela Descritiva População x Desmanches
+
+```{r}
+tab <- df %>%
+  group_by(year, d_desmanches) %>%
+  summarise(pop_mean = mean(pop))
+```
+
+### Gráficos de Linha com Base na Presença ou Não de Desmanches
+
+```{r}
+ggplot(df %>% group_by(year, d_desmanches) %>% mutate(roubo_veiculos=mean(roubo_veiculos)),
+       aes(year, roubo_veiculos, color=as.factor(d_desmanches))) +
+  geom_point() +
+  geom_line(aes(group=d_desmanches)) +
+  labs(title = "Roubo de Veiculos em Municipios Com e Sem Desmanches", x = "Anos", y = "Roubo de Veiculos")
+ggplot(df %>% group_by(year, d_desmanches) %>% mutate(furto_veiculos=mean(furto_veiculos)),
+       aes(year, furto_veiculos, color=as.factor(d_desmanches))) +
+  geom_point() +
+  geom_line(aes(group=d_desmanches)) +
+  labs(title = "Furto de Veiculos em Municipios Com e Sem Desmanches", x = "Anos", y = "Furto de Veiculos")
+ggplot(df %>% group_by(year, d_desmanches) %>% mutate(homicidios=mean(homicidios)),
+       aes(year, homicidios, color=as.factor(d_desmanches))) +
+  geom_point() +
+  geom_line(aes(group=d_desmanches)) +
+  labs(title = "Homicidios em Municipios Com e Sem Desmanches", x = "Anos", y = "Homicidios")
+ggplot(df %>% group_by(year, d_desmanches) %>% mutate(roubo_outros=mean(roubo_outros)),
+       aes(year, roubo_outros, color=as.factor(d_desmanches))) +
+  geom_point() +
+  geom_line(aes(group=d_desmanches)) +
+  labs(title = "Outros Roubos em Municipios Com e Sem Desmanches", x = "Anos", y = "Outros Roubos")
+```
+
+### Ajustando as Variáveis em Relação à População
+
+```{r}
+ggplot(df %>% group_by(year, d_desmanches) %>% mutate(roubo_veiculos=mean(roubo_veiculos/(pop/100000))),
+       aes(year, roubo_veiculos, color=as.factor(d_desmanches))) +
+  geom_point() +
+  geom_line(aes(group=d_desmanches)) +
+  labs(title = "Roubo de Veiculos em Municipios Com e Sem Desmanches em Relacao a Populacao", x = "Anos", y = "Roubo de Veiculos/100.000 Habitantes")
+ggplot(df %>% group_by(year, d_desmanches) %>% mutate(furto_veiculos=mean(furto_veiculos/(pop/100000))),
+       aes(year, furto_veiculos, color=as.factor(d_desmanches))) +
+  geom_point() +
+  geom_line(aes(group=d_desmanches)) +
+  labs(title = "Furto de Veiculos em Municipios Com e Sem Desmanches em Relacao a Populacao", x = "Anos", y = "Furto de Veiculos/100.000 Habitantes")
+ggplot(df %>% group_by(year, d_desmanches) %>% mutate(homicidios=mean(homicidios/(pop/100000))),
+       aes(year, homicidios, color=as.factor(d_desmanches))) +
+  geom_point() +
+  geom_line(aes(group=d_desmanches)) +
+  labs(title = "Homicidios em Municipios Com e Sem Desmanches em Relacao a Populacao", x = "Anos", y = "Homicidios/100.000 Habitantes")
+ggplot(df %>% group_by(year, d_desmanches) %>% mutate(roubo_outros=mean(roubo_outros/(pop/100000))),
+       aes(year, roubo_outros, color=as.factor(d_desmanches))) +
+  geom_point() +
+  geom_line(aes(group=d_desmanches)) +
+  labs(title = "Outros Roubos em Municipios Com e Sem Desmanches em Relacao a Populacao", x = "Anos", y = "Outros Roubos/100.000 Habitantes")
+```
+
+## Parte 3 - Testando a Hipótese Econômica
+
+### Ajuste do Modelo Pré-Regressões
+
+#### Criando a *dummy* para a "Lei dos Desmanches"
+
+```{r}
+df$dummyLaw <- ifelse(df$year < 2014, 0 , 1)
+```
+
+#### Criando a Variável Resposta: Crimes Relacionados a Veículos
+
+```{r}
+df$car_crime <- df$roubo_veiculos + df$furto_veiculos
+```
+
+#### Removendo Cidades que Causaram Incompatibilidade
+
+```{r}
+dft <- df
+teste = (table(dft$city, dft$date)!=1)
+```
+
+#### Drop do df Principal Com Apenas Valores Distintos
+
+```{r}
+new_df <- distinct(dft, dft$city, dft$date, dft$car_crime, dft$homicidios, dft$roubo_outros, dft$pop, dft$d_desmanches, dft$dummyLaw)
+```
+
+### Regressões do Painel
+
+#### Método *Pooled*
+
+```{r}
+reg.pooled <- plm(new_df$`dft$car_crime`~new_df$`dft$homicidios`+new_df$`dft$roubo_outros`+new_df$`dft$pop`+new_df$`dft$d_desmanches`+new_df$`dft$dummyLaw`, data = new_df, model  = "pooling")
+summary(reg.pooled)
+```
+
+#### Método Efeito Fixo
+
+```{r}
+reg.ef <- plm(new_df$`dft$car_crime`~new_df$`dft$homicidios`+new_df$`dft$roubo_outros`+new_df$`dft$pop`+new_df$`dft$d_desmanches`+new_df$`dft$dummyLaw`, data = new_df, model  = "within")
+summary(reg.ef)
+```
+
+#### Método Efeitos Aleatórios
+
+```{r}
+reg.ea <- plm(new_df$`dft$car_crime`~new_df$`dft$homicidios`+new_df$`dft$roubo_outros`+new_df$`dft$pop`+new_df$`dft$d_desmanches`+new_df$`dft$dummyLaw`, data = new_df, model  = "random")
+summary(reg.ea)
+```
+
+### Testes
+
+#### Teste de Chow
+
+```{r}
+pFtest(reg.ef, reg.pooled)
+```
+
+#### Teste de Breusch-Pagan
+
+```{r}
+plmtest(reg.pooled, type="bp")
+```
+
+#### Teste de Hausman
+
+```{r}
+# phtest(reg.ef, reg.ea, method = "aux", vcov = vcovHC) -> deu erro
+```
